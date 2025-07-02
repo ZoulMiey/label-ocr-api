@@ -1,47 +1,40 @@
 import express from "express";
 import cors from "cors";
 import vision from "@google-cloud/vision";
+import fs from "fs";
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS and JSON body parsing
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 
-// Google Vision client
 const client = new vision.ImageAnnotatorClient({
-  keyFilename: "api/your-service-account-key.json"  // Update this path if needed
+  keyFilename: "service-account-key.json",
 });
 
-// Route to confirm backend is running
-app.get("/", (req, res) => {
-  res.send("Label OCR API is running!");
-});
-
-// OCR endpoint
-app.post("/ocr", async (req, res) => {
+app.post("/api/ocr", async (req, res) => {
   try {
-    const { image } = req.body;
-
-    if (!image) {
-      return res.status(400).json({ error: "Image is required" });
+    const { base64 } = req.body;
+    if (!base64) {
+      return res.status(400).json({ error: "No base64 image provided" });
     }
 
-    const [result] = await client.textDetection({ image: { content: image } });
-    const detections = result.textAnnotations;
-
-    res.json({
-      text: detections[0]?.description || "",
-      raw: detections
+    const [result] = await client.textDetection({
+      image: { content: base64 },
     });
-  } catch (err) {
-    console.error("OCR error:", err);
-    res.status(500).json({ error: "OCR failed", details: err.message });
+
+    const detections = result.textAnnotations || [];
+    const text = detections[0]?.description || "";
+    res.json({ text });
+  } catch (error) {
+    console.error("OCR error:", error);
+    res.status(500).json({ error: "OCR failed" });
   }
 });
 
-// Start server (needed for local testing)
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
+
+export default app;
